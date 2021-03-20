@@ -9,50 +9,11 @@ import plotly.figure_factory as ff
 import plotly.graph_objs as go
 import plotly
 import re
-
-# prepare the raw data
-# episode_df = pd.read_csv("data/title.episode.tsv", delimiter='\t')
-# sp_df = episode_df[episode_df["parentTconst"] == "tt0121955"] # get all south park episodes
-# rating_df = pd.read_csv("data/title.ratings.tsv", delimiter='\t').set_index("tconst")
-# sp_rating = rating_df.reindex(sp_df["tconst"])
-
-# sp_df = pd.concat((sp_df.set_index("tconst"), sp_rating), axis=1)
-# sp_df["seasonNumber"] = pd.to_numeric(sp_df["seasonNumber"])
-# sp_df["episodeNumber"] = pd.to_numeric(sp_df["episodeNumber"])
-# sp_df = sp_df.set_index(["seasonNumber", "episodeNumber"]).sort_index()
-
-# sp_df = sp_df.dropna()["averageRating"]
-# sp_df.index.rename(["season", "episode"], inplace=True)
-# dialoge_df = pd.read_csv("data/All-seasons.csv")
-
-# dialoge_df.drop(dialoge_df[dialoge_df["Season"] == "Season"].index, inplace=True)
-# dialoge_df["Season"] = pd.to_numeric(dialoge_df["Season"])
-# dialoge_df["Episode"] = pd.to_numeric(dialoge_df["Episode"])
-# dialoge_df = dialoge_df.set_index(["Season", "Episode"]).sort_index()
-
-# dialoge_df.index.rename(["season", "episode"], inplace=True)
-# dialoge_df.columns = (["character", "line"])
-# dialoge_df
-
-full_data = pd.read_csv("data/lotr_scripts.csv")
-full_data
-# %%
-full_data[full_data["movie"] == "The Return of the King "].iloc[:50]
-
-# %%
-full_data.iloc[1570:1600]
-
-
-# %%
-for i, line in enumerate(full_data["dialog"]):
-
-    if type(line) == str and "Merin" in line:
-        print(line)
-        print(i)
-        print("--------")
-# %%
 import requests
 from bs4 import BeautifulSoup
+from PIL import Image
+from PIL import ImageFont
+from PIL import ImageDraw, ImageOps
 
 # %%
 book_1_urls = [
@@ -123,7 +84,7 @@ combined_data = pd.DataFrame(columns=["character", "text", "scene", "movie"])
 
 for movie_name, urls in zip(movie_names, movie_urls):
 
-    for url in urls: #[3:4]:
+    for url in urls:
         print(url)
 
         page = requests.get("http://www.ageofthering.com/" + url)
@@ -148,7 +109,6 @@ for movie_name, urls in zip(movie_names, movie_urls):
                 if not scene_found: continue
                     
                 if not speaker_found and row.get("valign") == "top" and row.get("colspan") == None:
-                    # print(row)
                     speaker = row.text.strip().replace(":","")
                     if speaker.isupper():
                         speakers.append(speaker)
@@ -156,14 +116,10 @@ for movie_name, urls in zip(movie_names, movie_urls):
                         scene_names.append(scene_name)
 
                 elif speaker_found:
-                    # print(row)
                     text = " ".join(row.text.replace("\r\n", "").split()).strip()
                     text = re.sub(r"\(.*?\)", r"", text)
                     texts.append(text)
                     speaker_found = False
-
-        # print(speakers)
-        # print(texts)
 
         scene_data = pd.DataFrame({"character":speakers, "text":texts, "scene": scene_names, "movie": movie_name})
         combined_data = pd.concat((combined_data, scene_data), axis=0)
@@ -218,19 +174,11 @@ scenes = \
 missing_text = pd.DataFrame({"character":speakers, "text":texts, "scene": scenes, "movie": movie_names[0]})
 
 # %%
-len(speakers)
-
-# %%
 before_missing = combined_data[combined_data["movie"] == movie_names[0]]
 after_missing = combined_data[combined_data["movie"] != movie_names[0]]
 full_data = pd.concat([before_missing, missing_text, after_missing]).reset_index(drop=True)
 full_data.to_csv("./data/lotr_script_extended.csv")
 full_data
-
-
-# %%
-# TODO: fix scene names
-# 
 
 # %%
 # find main characters by counting speaking lines
@@ -273,10 +221,10 @@ pos = nx.circular_layout(G)
 # pos = nx.spring_layout(G) 
 
 edges = G.edges()
-colors = [G[u][v]['weight']**0.1 for u,v in edges]
-weights = [G[u][v]['weight']**0.7 if G[u][v]['weight'] > 4 else 0 for u,v in edges]
+colors = [G[u][v]['weight']**0.6 for u,v in edges]
+weights = [G[u][v]['weight']**0.8 if G[u][v]['weight'] > 4 else 0 for u,v in edges]
 
-cmap = matplotlib.cm.get_cmap('YlGn')
+cmap = matplotlib.cm.get_cmap('plasma_r')
 # cmap = matplotlib.cm.get_cmap('ocean')
 nx.draw_networkx(G, pos, width=weights, edge_color=colors, node_color="brown", edge_cmap=cmap, with_labels=False, node_size=700)
 
@@ -289,32 +237,38 @@ plt.axis("equal")
 plt.tight_layout()
 plt.savefig("./output/connection_graph_raw.png")
 # %%
-from PIL import Image
-from PIL import ImageFont
-from PIL import ImageDraw 
-
 img = Image.open("./output/connection_graph_raw.png")
+
+# adjust size
+width, height = img.size
+img = img.crop((25, 25, width-25, height-25))
+img = ImageOps.expand(img, (25, 500, 25,125), fill="white")
 draw = ImageDraw.Draw(img)
 
+# add title card
+title_card_img = Image.open("./fonts/title_card.png")
+width, height = title_card_img.size
+title_card_img = title_card_img.resize((int(width * 1), int(height * 1)), Image.ANTIALIAS)
+img.paste(title_card_img, (630, 10), mask=title_card_img)
 
-font = ImageFont.truetype("./aniron/anirb___.ttf", size=100)
-# draw.text((x, y),"Sample Text",(r,g,b))
-draw.text((700, 0),"  Lord of the Rings\nInteraction Intensity", (0,0,0), font=font,)
+# add subtitle
+font = ImageFont.truetype("./fonts/aniron/anirb___.ttf", size=105)
+draw.text((880, 400),"Interaction Intensity", (0,0,0), font=font,)
 
-font = ImageFont.truetype("./kelt/KELTB___.TTF", size=50)
+# add description
+font = ImageFont.truetype("./fonts/kelt/KELTB___.TTF", size=55)
 description = \
 """
 Displays the number of times two characters speak after one another, giving an approximation of how much the characters talk to each other. 
-If two characters have less than 4 interactions, no line is drawn. Main source: www.ageofthering.com/atthemovies
+If two characters have less than 4 interactions, no line is drawn. 
+Combined data from all 3 movies. Source: www.ageofthering.com/atthemovies
 """
-draw.text((100, 2700), description, (0,0,0), font=font)
-# img.save('sample-out.png')
+draw.text((100, 3230), description, (0,0,0), font=font)
+
+# font = ImageFont.truetype("/usr/share/fonts/truetype/Ubuntu/Ubuntu-L.ttf", 40)
+# draw.text((100, 3390), "Source: www.ageofthering.com/atthemovies", (0,0,0), font=font)
+
+
+img.save("./output/connection_graph_text.png")
 
 display(img)
-# %%
-font = ImageFont.truetype("/usr/share/fonts/dejavu/DejaVuSans.ttf", 25)
-img = Image.new("RGBA", (200,200), (120,20,20))
-draw = ImageDraw.Draw(img)
-draw.text((0,0), "This is a test", (255,255,0), font=font)
-display(img)
-# %%
