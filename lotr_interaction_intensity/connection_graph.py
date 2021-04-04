@@ -177,6 +177,11 @@ missing_text = pd.DataFrame({"character":speakers, "text":texts, "scene": scenes
 before_missing = combined_data[combined_data["movie"] == movie_names[0]]
 after_missing = combined_data[combined_data["movie"] != movie_names[0]]
 full_data = pd.concat([before_missing, missing_text, after_missing]).reset_index(drop=True)
+# %%
+full_data["scene"] = full_data["scene"].str.extract(r".*~\s?(.*)($|\n\n\n.*)")[0].str.replace("     ", " ")
+# %%
+# %%
+
 full_data.to_csv("./data/lotr_script_extended.csv")
 full_data
 
