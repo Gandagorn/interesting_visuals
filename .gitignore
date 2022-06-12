@@ -131,3 +131,4 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+LOTR Book Movie Comparison/data/books/*
